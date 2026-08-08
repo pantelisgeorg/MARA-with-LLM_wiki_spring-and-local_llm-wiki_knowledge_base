@@ -7,7 +7,6 @@ import json
 import urllib.request
 import urllib.parse
 from langchain_openai import ChatOpenAI
-from langchain_community.tools import DuckDuckGoSearchResults
 from agents.state import ResearchState
 
 # LLM endpoint — env-driven so you can swap providers without editing code.
@@ -30,15 +29,11 @@ llm = ChatOpenAI(
     extra_body=_extra_body,
 )
 
-# --- Data source selection -------------------------------------------------
-# When WIKI_SEARCH_URL is set (e.g. http://localhost:8080), research is answered
-# from the llm-wiki knowledge base served by LLM_wiki_spring instead of the web.
+# Wiki knowledge base endpoint (LLM_wiki_spring).
 # Retrieval = semantic search over entities/concepts/sources pages (index.md /
 # log.md are excluded by the embedding service) + one-hop expansion along the
-# consolidation cross-link graph. DuckDuckGo is the fallback when unset.
-WIKI_BASE = os.getenv("WIKI_SEARCH_URL", "").rstrip("/")
-USE_WIKI = bool(WIKI_BASE)
-search_tool = None if USE_WIKI else DuckDuckGoSearchResults(max_results=4)
+# consolidation cross-link graph.
+WIKI_BASE = os.getenv("WIKI_SEARCH_URL", "http://localhost:8080").rstrip("/")
 
 
 def _http_json(method: str, path: str, body: dict | None = None,
@@ -66,8 +61,6 @@ def _wiki_graph() -> dict | None:
     if _wiki_graph_loaded:
         return _wiki_graph_cache
     _wiki_graph_loaded = True
-    if not USE_WIKI:
-        return None
     try:
         _wiki_graph_cache = _http_json(
             "GET", "/api/wiki/graph", params={"includeSources": "true"})
@@ -124,7 +117,6 @@ def _wiki_retrieve(question: str, limit: int = 6, max_pages: int = 8) -> tuple[s
     seed_paths = [h.get("file", "") for h in hits if h.get("file")]
     score_by_path = {h.get("file", ""): float(h.get("score", 0.0)) for h in hits}
 
-    # One-hop graph expansion: add direct cross-link neighbors of seed pages.
     _, adj = _wiki_adjacency()
     paths = list(seed_paths)
     for p in seed_paths:
@@ -157,8 +149,6 @@ def _wiki_index() -> str | None:
     if _wiki_index_loaded:
         return _wiki_index_cache or None
     _wiki_index_loaded = True
-    if not USE_WIKI:
-        return None
     try:
         got = _http_json("GET", "/api/qmd/get", params={"file": "wiki/index.md"})
         _wiki_index_cache = got.get("text", "") if isinstance(got, dict) else ""
@@ -191,32 +181,22 @@ def _normalize(s: str) -> str:
 
 def planner(state: ResearchState) -> dict:
     """Break the topic into 3-5 focused sub-questions."""
-    index_text = _wiki_index() if USE_WIKI else None
-    graph_text = _wiki_graph_summary() if USE_WIKI else None
-    if index_text or graph_text:
-        parts = [
-            "You are a research planner. The research must be answered strictly "
-            "from a knowledge base. Below is the knowledge base's catalog of "
-            "available topics and its graph of cross-links between them. Given the "
-            "topic, produce 3-5 specific sub-questions that, when answered together, "
-            "form a comprehensive report — but keep every sub-question answerable "
-            "from the listed topics, and prefer questions that trace the shown "
-            "relationships. Return ONLY a JSON array of strings. No thinking tags.",
-            "",
-            f"Topic: {state['topic']}",
-        ]
-        if index_text:
-            parts.append(f"\nKnowledge base catalog:\n{index_text}")
-        if graph_text:
-            parts.append(f"\nRelationship graph (page -> linked pages):\n{graph_text}")
-        prompt = "\n".join(parts)
-    else:
-        prompt = (
-            f"You are a research planner. Given the topic below, produce 3-5 specific "
-            f"sub-questions that, when answered together, would form a comprehensive "
-            f"research report. Return ONLY a JSON array of strings. No thinking tags.\n\n"
-            f"Topic: {state['topic']}"
-        )
+    index_text = _wiki_index()
+    graph_text = _wiki_graph_summary()
+    prompt = (
+        "You are a research planner. The research must be answered strictly "
+        "from a knowledge base. Below is the knowledge base's catalog of "
+        "available topics and its graph of cross-links between them. Given the "
+        "topic, produce 3-5 specific sub-questions that, when answered together, "
+        "form a comprehensive report — but keep every sub-question answerable "
+        "from the listed topics, and prefer questions that trace the shown "
+        "relationships. Return ONLY a JSON array of strings. No thinking tags.\n\n"
+        f"Topic: {state['topic']}"
+    )
+    if index_text:
+        prompt += f"\n\nKnowledge base catalog:\n{index_text}"
+    if graph_text:
+        prompt += f"\n\nRelationship graph (page -> linked pages):\n{graph_text}"
     resp = llm.invoke(prompt)
     content = _extract_json(_clean(resp.content))
     try:
@@ -233,33 +213,19 @@ def planner(state: ResearchState) -> dict:
 # ### Researcher ###
 
 def _research_question(question: str) -> dict:
-    """Search the knowledge base (or web) and summarize findings for a question."""
-    sources: list[str] = []
-    if USE_WIKI:
-        raw, sources = _wiki_retrieve(question)
-        prompt = (
-            f"You are a research analyst working strictly from a knowledge base. "
-            f"Using ONLY the sources below, write a concise 2-3 paragraph summary "
-            f"answering the question. Do not use any prior knowledge — every claim "
-            f"must be supported by the provided sources. If the sources do not cover "
-            f"part of the question, say so explicitly and omit that part rather than "
-            f"speculating. Write clean prose; do not include citations. No thinking tags.\n\n"
-            f"Question: {question}\n\nKnowledge base sources:\n{raw}"
-        )
-    else:
-        raw = search_tool.invoke(question)
-        prompt = (
-            f"You are a research analyst. Based on the search results below, write a "
-            f"concise 2-3 paragraph summary answering the question. Ground your answer "
-            f"in the provided sources; if they do not cover the question, say so "
-            f"explicitly. No thinking tags.\n\n"
-            f"Question: {question}\n\nSearch results:\n{raw}"
-        )
+    """Search the knowledge base and summarize findings for a question."""
+    raw, sources = _wiki_retrieve(question)
+    prompt = (
+        f"You are a research analyst working strictly from a knowledge base. "
+        f"Using ONLY the sources below, write a concise 2-3 paragraph summary "
+        f"answering the question. Do not use any prior knowledge — every claim "
+        f"must be supported by the provided sources. If the sources do not cover "
+        f"part of the question, say so explicitly and omit that part rather than "
+        f"speculating. Write clean prose; do not include citations. No thinking tags.\n\n"
+        f"Question: {question}\n\nKnowledge base sources:\n{raw}"
+    )
     summary = llm.invoke(prompt)
-    result = {"question": question, "findings": _clean(summary.content)}
-    if USE_WIKI:
-        result["sources"] = sources
-    return result
+    return {"question": question, "findings": _clean(summary.content), "sources": sources}
 
 
 def researcher(state: ResearchState) -> dict:
@@ -284,29 +250,22 @@ def critic(state: ResearchState) -> dict:
         f"Q: {r['question']}\n{r['findings']}"
         for r in state["research_results"] + state.get("gap_research", [])
     )
-    # Questions already researched (planner sub-questions + prior gap rounds).
     researched = list(state.get("sub_questions", [])) + [
         r.get("question", "") for r in state.get("gap_research", [])
     ]
     researched_str = "\n".join(f"- {q}" for q in researched if q) or "(none yet)"
-    if USE_WIKI:
-        gap_rule = (
-            f"The knowledge base is FIXED — do not flag gaps about topics it cannot "
-            f"cover. The questions listed below have ALREADY been researched; do NOT "
-            f"re-flag any of them or anything already covered by the findings. Only "
-            f"flag a gap if it is essential to the topic AND likely answerable from "
-            f"the knowledge base. Return at most 2 gaps. If the findings adequately "
-            f"cover the topic given what the knowledge base contains, return an empty "
-            f"gaps array."
-        )
-    else:
-        gap_rule = f"Return a JSON array of missing sub-questions (empty if none)."
     resp = llm.invoke(
         f"You are a research critic. Review the findings below for the topic "
         f'"{state["topic"]}".\n\n'
         f"Findings:\n{all_findings}\n\n"
         f"Already-researched questions (do not repeat these):\n{researched_str}\n\n"
-        f"{gap_rule}\n\n"
+        f"The knowledge base is FIXED — do not flag gaps about topics it cannot "
+        f"cover. The questions listed above have ALREADY been researched; do NOT "
+        f"re-flag any of them or anything already covered by the findings. Only "
+        f"flag a gap if it is essential to the topic AND likely answerable from "
+        f"the knowledge base. Return at most 2 gaps. If the findings adequately "
+        f"cover the topic given what the knowledge base contains, return an empty "
+        f"gaps array.\n\n"
         f"Respond in JSON with two keys:\n"
         f'  "critique": a short paragraph assessing quality,\n'
         f'  "gaps": a JSON array of strings.\n'
@@ -322,7 +281,6 @@ def critic(state: ResearchState) -> dict:
         gaps = []
     if not isinstance(gaps, list):
         gaps = []
-    # Safety net: drop gaps duplicating an already-researched question, cap at 2.
     seen_norm = {_normalize(q) for q in researched if q}
     deduped: list[str] = []
     for g in gaps:
@@ -350,36 +308,26 @@ def writer(state: ResearchState) -> dict:
         f"Q: {r['question']}\n{r['findings']}"
         for r in state["research_results"] + state.get("gap_research", [])
     )
-    if USE_WIKI:
-        report_rule = (
-            f"Write using ONLY the findings below — do not introduce any fact not "
-            f"present in the findings, and do not use prior knowledge. Write clean "
-            f"prose without inline citations; do not add a sources section."
-        )
-    else:
-        report_rule = (
-            f"Use headers, bullet points where helpful, and keep it professional."
-        )
     resp = llm.invoke(
         f"You are a senior research writer. Using the findings and critique below, "
         f"write a polished, well-structured markdown report on the topic "
         f'"{state["topic"]}".\n\n'
         f"Include: title, executive summary, sections for each key area, and a "
-        f"conclusion. {report_rule} Do not include any thinking tags.\n\n"
+        f"conclusion. Write using ONLY the findings below — do not introduce any "
+        f"fact not present in the findings, and do not use prior knowledge. Write "
+        f"clean prose without inline citations; do not add a sources section. "
+        f"Do not include any thinking tags.\n\n"
         f"Findings:\n{all_findings}\n\nCritique:\n{state['critique']}"
     )
     report = _clean(resp.content)
-    # Append a deterministic Sources section from the wiki pages actually retrieved
-    # (accurate provenance, no LLM guessing at citations).
-    if USE_WIKI:
-        seen: list[str] = []
-        for r in state["research_results"] + state.get("gap_research", []):
-            for p in r.get("sources", []) or []:
-                if p and p not in seen:
-                    seen.append(p)
-        if seen:
-            report = report.rstrip() + "\n\n## Sources\n" + "\n".join(
-                f"- [[{p}]]" for p in seen)
+    seen: list[str] = []
+    for r in state["research_results"] + state.get("gap_research", []):
+        for p in r.get("sources", []) or []:
+            if p and p not in seen:
+                seen.append(p)
+    if seen:
+        report = report.rstrip() + "\n\n## Sources\n" + "\n".join(
+            f"- [[{p}]]" for p in seen)
     return {"final_report": report, "status": "Report complete"}
 
 

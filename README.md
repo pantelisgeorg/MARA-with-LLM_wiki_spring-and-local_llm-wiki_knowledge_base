@@ -58,9 +58,7 @@ Each agent is a LangGraph node with typed state passing via `ResearchState`. Con
 
 5. **Writer** composes a structured markdown report from accumulated findings, appending a deterministic `## Sources` section with `[[wiki/...]]` provenance links — no LLM hallucinated citations.
 
-### Fallback mode
-
-If `WIKI_SEARCH_URL` is left empty, M.A.R.A. falls back to **DuckDuckGo web search** and can use any OpenAI-compatible LLM (Google AI Studio, Together, etc.).
+All research is answered strictly from the knowledge base — there is no web search fallback.
 
 ---
 
@@ -141,7 +139,7 @@ WIKI_SEARCH_URL=http://localhost:8080
 
 For **ollama**, change `LLM_API_BASE` to `http://localhost:11434/v1` and `LLM_MODEL` to the ollama model name (e.g. `gemma3:12b`).
 
-For **cloud LLMs** (Google AI Studio, OpenAI, Together), leave `LLM_API_BASE` empty or point it at the provider's endpoint, set the appropriate API key, and optionally leave `WIKI_SEARCH_URL` empty to fall back to DuckDuckGo web search.
+For **cloud LLMs** (Google AI Studio, OpenAI, Together), point `LLM_API_BASE` at the provider's endpoint and set the appropriate API key.
 
 ### 4. Install Python dependencies
 
@@ -180,7 +178,7 @@ Open `http://localhost:8501`, enter a topic covered by your knowledge base, and 
 | `LLM_API_BASE` | Yes | `https://generativelanguage.googleapis.com/v1beta/openai/` | LLM endpoint (llama.cpp, ollama, or cloud) |
 | `LLM_MODEL` | Yes | `gemini-2.5-flash` | Model name passed to the endpoint |
 | `LLM_API_KEY` | Yes* | `GOOGLE_API_KEY` | API key (any string for local servers) |
-| `WIKI_SEARCH_URL` | No | (empty) | Wiki server base URL; unset = DuckDuckGo fallback |
+| `WIKI_SEARCH_URL` | No | `http://localhost:8080` | Wiki server base URL |
 | `LLM_ENABLE_THINKING` | No | `false` | Set to `true` if using Gemma 4 thinking models |
 
 \* Required for cloud providers. llama.cpp and ollama accept any non-empty string.
