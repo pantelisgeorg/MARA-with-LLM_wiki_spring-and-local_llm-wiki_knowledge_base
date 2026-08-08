@@ -50,7 +50,7 @@ Each agent is a LangGraph node with typed state passing via `ResearchState`. Con
 
 1. **Planner** reads the knowledge base catalog (`wiki/index.md`) and cross-link graph, then generates 3–5 sub-questions constrained to topics the KB can answer.
 
-2. **Researcher** performs semantic search over the wiki (OpenAI `text-embedding-3-small` embeddings, cosine similarity), expands results one hop along the cross-link graph, fetches full page text, and synthesizes findings with the local LLM.
+2. **Researcher** performs semantic search over the wiki (the wiki server handles `text-embedding-3-small` embeddings server-side — no embedding key needed here), expands results one hop along the cross-link graph, fetches full page text, and synthesizes findings with the local LLM.
 
 3. **Critic** reviews all findings, identifies gaps (max 2 per loop), deduplicates against already-researched questions, and routes back to research if gaps remain.
 
