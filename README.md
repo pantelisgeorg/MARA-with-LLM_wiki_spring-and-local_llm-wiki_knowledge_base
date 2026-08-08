@@ -125,17 +125,11 @@ ollama pull gemma3:12b          # or any model
 
 ### 3. Create `.env`
 
-Create a `.env` file in the project root. The only required variable for local use is `LLM_API_KEY` (any non-empty string works for local servers):
-
 ```
 LLM_API_KEY=local
 ```
 
-That's it. By default M.A.R.A. connects to:
-- **LLM** → `http://localhost:8083/v1` (llama.cpp)
-- **Wiki** → `http://localhost:8080`
-
-Override with the [env vars below](#configuration) if your ports/model differ.
+See the [Configuration](#configuration) section for all available variables.
 
 ### 4. Install Python dependencies
 
