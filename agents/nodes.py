@@ -9,23 +9,22 @@ import urllib.parse
 from langchain_openai import ChatOpenAI
 from agents.state import ResearchState
 
-# LLM endpoint — env-driven so you can swap providers without editing code.
-# Defaults to Google AI Studio (Gemini). For llama.cpp, set LLM_API_BASE to its
-# OpenAI-compatible /v1 endpoint, LLM_MODEL to the loaded model name, and
-# LLM_API_KEY to any non-empty string (llama.cpp ignores it).
+# LLM endpoint — defaults to llama.cpp on :8083. Override via .env.
+# For ollama, set LLM_API_BASE=http://localhost:11434/v1.
+# For cloud providers (OpenAI, Gemini), set LLM_API_BASE and LLM_API_KEY accordingly.
 #
 # Thinking models (e.g. Gemma 4) emit a separate `reasoning_content` that can
-# consume the whole token budget and leave `content` empty. For custom endpoints
-# (llama.cpp) we disable thinking by default so the answer lands in `content`.
-# Override with LLM_ENABLE_THINKING=true.
+# consume the whole token budget and leave `content` empty. Thinking is disabled
+# by default for custom endpoints (llama.cpp / ollama) so the answer lands in
+# `content`. Override with LLM_ENABLE_THINKING=true.
 _custom_endpoint = bool(os.getenv("LLM_API_BASE"))
 _disable_thinking = _custom_endpoint and os.getenv("LLM_ENABLE_THINKING", "false").lower() != "true"
 _extra_body = {"chat_template_kwargs": {"enable_thinking": False}} if _disable_thinking else None
 llm = ChatOpenAI(
-    model=os.getenv("LLM_MODEL", "gemini-2.5-flash"),
+    model=os.getenv("LLM_MODEL", "unsloth/gemma-4-12b-it-GGUF:Q4_K_M"),
     temperature=0.1,
-    openai_api_key=os.getenv("LLM_API_KEY", os.getenv("GOOGLE_API_KEY", "not-set")),
-    openai_api_base=os.getenv("LLM_API_BASE", "https://generativelanguage.googleapis.com/v1beta/openai/"),
+    openai_api_key=os.getenv("LLM_API_KEY", "local"),
+    openai_api_base=os.getenv("LLM_API_BASE", "http://localhost:8083/v1"),
     extra_body=_extra_body,
 )
 

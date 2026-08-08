@@ -123,23 +123,21 @@ ollama pull gemma3:12b          # or any model
 # ollama exposes OpenAI-compatible API at http://localhost:11434/v1
 ```
 
-### 3. Configure environment
+### 3. Create `.env`
 
-```bash
-# Create .env manually with the variables below
-```
+Create a `.env` file in the project root. The only required variable for local use is `LLM_API_KEY` (any non-empty string works for local servers):
 
-For **llama.cpp**:
 ```
-LLM_API_BASE=http://localhost:8083/v1
-LLM_MODEL=unsloth/gemma-4-12b-it-GGUF:Q4_K_M
 LLM_API_KEY=local
-WIKI_SEARCH_URL=http://localhost:8080
 ```
 
-For **ollama**, change `LLM_API_BASE` to `http://localhost:11434/v1` and `LLM_MODEL` to the ollama model name (e.g. `gemma3:12b`).
+That's it. By default M.A.R.A. connects to:
+- **LLM** → `http://localhost:8083/v1` (llama.cpp) with model `gemini-2.5-flash`
+- **Wiki** → `http://localhost:8080`
 
-For **cloud LLMs** (Google AI Studio, OpenAI, Together), point `LLM_API_BASE` at the provider's endpoint and set the appropriate API key.
+Override with the [env vars below](#configuration) if your ports/model differ.
+
+For **cloud providers** (Google AI Studio, OpenAI, etc.), set `LLM_API_BASE` and `LLM_API_KEY` to the provider's endpoint and key.
 
 ### 4. Install Python dependencies
 
@@ -171,17 +169,35 @@ Open `http://localhost:8501`, enter a topic covered by your knowledge base, and 
 
 ---
 
-## Configuration Reference
+## Configuration
 
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `LLM_API_BASE` | Yes | `https://generativelanguage.googleapis.com/v1beta/openai/` | LLM endpoint (llama.cpp, ollama, or cloud) |
-| `LLM_MODEL` | Yes | `gemini-2.5-flash` | Model name passed to the endpoint |
-| `LLM_API_KEY` | Yes* | `GOOGLE_API_KEY` | API key (any string for local servers) |
-| `WIKI_SEARCH_URL` | No | `http://localhost:8080` | Wiki server base URL |
-| `LLM_ENABLE_THINKING` | No | `false` | Set to `true` if using Gemma 4 thinking models |
+### Local
 
-\* Required for cloud providers. llama.cpp and ollama accept any non-empty string.
+Default `.env` for llama.cpp or ollama:
+
+```
+LLM_API_KEY=local
+```
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `LLM_API_KEY` | `local` | Any string — llama.cpp/ollama ignore it. |
+| `LLM_API_BASE` | `http://localhost:8083/v1` | Use `:11434/v1` for ollama. |
+| `LLM_MODEL` | `unsloth/gemma-4-12b-it-GGUF:Q4_K_M` | Set to the model loaded in your server. |
+| `WIKI_SEARCH_URL` | `http://localhost:8080` | LLM_wiki_spring server. |
+| `LLM_ENABLE_THINKING` | `false` | Set to `true` for Gemma 4 thinking models. |
+
+### Cloud providers
+
+Override `LLM_API_BASE` and `LLM_API_KEY`:
+
+```
+LLM_API_BASE=https://api.openai.com/v1
+LLM_API_KEY=sk-...
+LLM_MODEL=gpt-4o
+```
+
+Same principle for Google AI Studio, Together, etc.
 
 ---
 
