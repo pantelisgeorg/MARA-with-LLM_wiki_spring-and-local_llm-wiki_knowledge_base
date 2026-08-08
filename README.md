@@ -50,7 +50,7 @@ Each agent is a LangGraph node with typed state passing via `ResearchState`. Con
 
 1. **Planner** reads the knowledge base catalog (`wiki/index.md`) and cross-link graph, then generates 3–5 sub-questions constrained to topics the KB can answer.
 
-2. **Researcher** performs semantic search over the wiki (the wiki server handles `text-embedding-3-small` embeddings server-side — no embedding key needed here), expands results one hop along the cross-link graph, fetches full page text, and synthesizes findings with the local LLM.
+2. **Researcher** queries the [LLM_wiki_spring](https://github.com/pantelisgeorg/LLM_wiki_spring) server (which handles `text-embedding-3-small` embeddings server-side — no embedding key needed here), expands results one hop along the cross-link graph, fetches full page text, and synthesizes findings with the local LLM.
 
 3. **Critic** reviews all findings, identifies gaps (max 2 per loop), deduplicates against already-researched questions, and routes back to research if gaps remain.
 
@@ -90,7 +90,7 @@ This project depends on three external services:
 | Service | Purpose | Repo / Source |
 |---------|---------|---------------|
 | **llm-wiki** | The knowledge base — a folder of markdown pages (`wiki/entities/`, `wiki/concepts/`, `wiki/sources/`) with an `index.md` catalog and cross-links via `[[wiki/...]]` references | Your own knowledge |
-| **LLM_wiki_spring** | Spring Boot app that serves the wiki over HTTP with semantic search (embeddings), full-text fetch, and graph traversal | `~/Desktop/LLM_wiki_spring/` |
+| **LLM_wiki_spring** | Spring Boot app that serves the wiki over HTTP with semantic search (embeddings), full-text fetch, and graph traversal | [pantelisgeorg/LLM_wiki_spring](https://github.com/pantelisgeorg/LLM_wiki_spring) |
 | **llama.cpp** or **ollama** | Local LLM inference server with an OpenAI-compatible `/v1` endpoint | [llama.cpp](https://github.com/ggml-org/llama.cpp) or [ollama](https://ollama.com) |
 
 ---
