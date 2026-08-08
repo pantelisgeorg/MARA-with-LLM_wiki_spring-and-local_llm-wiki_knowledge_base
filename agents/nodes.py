@@ -23,6 +23,7 @@ _extra_body = {"chat_template_kwargs": {"enable_thinking": False}} if _disable_t
 llm = ChatOpenAI(
     model=os.getenv("LLM_MODEL", "unsloth/gemma-4-12b-it-GGUF:Q4_K_M"),
     temperature=0.1,
+    max_retries=3,
     openai_api_key=os.getenv("LLM_API_KEY", "local"),
     openai_api_base=os.getenv("LLM_API_BASE", "http://localhost:8083/v1"),
     extra_body=_extra_body,
