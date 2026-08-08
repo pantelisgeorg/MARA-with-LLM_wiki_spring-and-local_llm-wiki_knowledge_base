@@ -132,12 +132,10 @@ LLM_API_KEY=local
 ```
 
 That's it. By default M.A.R.A. connects to:
-- **LLM** → `http://localhost:8083/v1` (llama.cpp) with model `gemini-2.5-flash`
+- **LLM** → `http://localhost:8083/v1` (llama.cpp)
 - **Wiki** → `http://localhost:8080`
 
 Override with the [env vars below](#configuration) if your ports/model differ.
-
-For **cloud providers** (Google AI Studio, OpenAI, etc.), set `LLM_API_BASE` and `LLM_API_KEY` to the provider's endpoint and key.
 
 ### 4. Install Python dependencies
 
